@@ -144,7 +144,8 @@ kam, während die Integration gestoppt war, wird bei ihrem Neustart gemeldet.
 ## Grenzen
 
 - Nur lesend: die Integration ändert nichts in Ghost.
-- Ein Blog pro Integration.
+- Ein Blog pro Integration. Ein archivierter Newsletter behält sein Gerät und
+  seinen letzten Wert: Lösche es in Gladys.
 - „Zahlende Mitglieder“ sind alle Mitglieder minus die kostenlosen: zahlende
   und geschenkte Tarife zusammen.
 - Ein mit vergangenem Datum (rückdatiert) veröffentlichter Beitrag löst

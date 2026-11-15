@@ -18,9 +18,9 @@
 // request carries a JWT (HS256, signed with the hex-decoded secret, `kid` the
 // key id, audience `/admin/`, five minutes), made here with node:crypto.
 //
-// Redirects are followed by hand, three at most, the path of the API kept
-// (http:// to https://, a Ghost(Pro) admin domain): only the short-lived JWT
-// travels, never the secret.
+// Redirects are followed by hand, three at most, the path of the API kept,
+// only to https:// on the same host or a Ghost(Pro) admin domain: only the
+// short-lived JWT travels, never the secret.
 // -----------------------------------------------------------------------------
 
 import { createHmac } from 'node:crypto';
@@ -118,6 +118,16 @@ const time = (value) => {
   const ms = typeof value === 'string' ? Date.parse(value) : NaN;
   return Number.isFinite(ms) ? ms : null;
 };
+
+/** The `errors[0].code` of a Ghost error answer (or its type), '' otherwise. */
+function ghostErrorCode(body) {
+  try {
+    const error = JSON.parse(body)?.errors?.[0];
+    return String(error?.code || error?.type || '');
+  } catch {
+    return '';
+  }
+}
 
 function total(data) {
   const value = data?.meta?.pagination?.total;
@@ -224,10 +234,14 @@ export class GhostClient {
         url = next;
         continue;
       }
-      if (status === 401 || status === 403) {
-        throw new GhostError(ERROR_KINDS.AUTH, `Admin API key refused (HTTP ${status})`, {
-          status,
-        });
+      if ((status === 401 || status === 403) && ghostErrorCode(response.body)) {
+        // Ghost says why (INVALID_JWT, an expired token…); a proxy or a
+        // firewall in front of it answers without its error format.
+        throw new GhostError(
+          ERROR_KINDS.AUTH,
+          `Admin API key refused (HTTP ${status}, ${ghostErrorCode(response.body)})`,
+          { status },
+        );
       }
       if (status === 429) {
         throw new GhostError(ERROR_KINDS.RATE_LIMIT, 'Too many requests (HTTP 429)', { status });
@@ -262,10 +276,17 @@ export class GhostClient {
     }
     const href = target?.href.split('?')[0] ?? '';
     const suffix = `${API_PATH}${path.split('?')[0]}`;
+    const source = new URL(from);
+    // The JWT opens the whole Admin API for five minutes: it follows an
+    // upgrade to https:// on the same host, or the admin domain of Ghost(Pro),
+    // never a downgrade nor another host.
+    const allowed =
+      target &&
+      target.protocol === 'https:' &&
+      (target.hostname === source.hostname || target.hostname.endsWith('.ghost.io'));
     if (
       hop >= MAX_REDIRECTS ||
-      !target ||
-      !['http:', 'https:'].includes(target.protocol) ||
+      !allowed ||
       target.username ||
       target.password ||
       !href.endsWith(suffix)

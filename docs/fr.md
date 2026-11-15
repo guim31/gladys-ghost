@@ -143,7 +143,8 @@ redémarrage.
 ## Limites
 
 - Lecture seule : l'intégration ne modifie rien dans Ghost.
-- Un blog par intégration.
+- Un blog par intégration. Une newsletter archivée garde son appareil et sa
+  dernière valeur : supprimez-le dans Gladys.
 - « Membres payants » est le total des membres moins les gratuits : formules
   payantes et offertes ensemble.
 - Un article publié avec une date passée (antidaté) ne déclenche pas **Article

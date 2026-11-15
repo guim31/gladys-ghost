@@ -67,6 +67,16 @@ export function newerThan(marker, items, dateOf) {
     .sort((a, b) => dateOf(a) - dateOf(b));
 }
 
+// The SDK refuses a scene event string longer than this.
+const MAX_EVENT_TEXT = 1000;
+
+/** A marker read from /data, whatever its state. */
+function marker(raw) {
+  const at = Number.isFinite(raw?.at) ? raw.at : 0;
+  const ids = Array.isArray(raw?.ids) ? raw.ids.filter((id) => typeof id === 'string') : [];
+  return { at, ids };
+}
+
 const memberDate = (member) => member.createdAt;
 const postDate = (post) => post.publishedAt;
 
@@ -100,7 +110,7 @@ export class GhostHub {
     this.transports = new Map();
     this.connection = null;
     this.discovered = null;
-    this.saved = { blogs: {} };
+    this.saved = { blogs: {}, keys: {} };
     this.pollTimer = null;
     this.stopped = false;
     this.problems = new ProblemLog(logger);
@@ -110,8 +120,8 @@ export class GhostHub {
 
   async start(config) {
     const saved = await this.store.load();
-    const blogs = saved?.blogs;
-    this.saved = { blogs: blogs && typeof blogs === 'object' ? blogs : {} };
+    const object = (value) => (value && typeof value === 'object' ? value : {});
+    this.saved = { blogs: object(saved?.blogs), keys: object(saved?.keys) };
     await this.reconfigure(config);
   }
 
@@ -235,8 +245,12 @@ export class GhostHub {
     if (wasError) {
       logger.info('Ghost answers again');
     }
-    // The site uuid names the devices; an old Ghost without it, the address.
-    const key = snapshot.site.uuid || hostOf(this.config.url);
+    // The site uuid names the devices (an old Ghost without it, the address),
+    // kept per address: the ids never change, and a restart with Ghost down
+    // still knows which devices go offline.
+    const key = this.saved.keys[this.config.url] || snapshot.site.uuid || hostOf(this.config.url);
+    const keyIsNew = this.saved.keys[this.config.url] !== key;
+    this.saved.keys[this.config.url] = key;
     const blog = { key, ...snapshot };
     if (firstRead) {
       logger.info(
@@ -248,7 +262,7 @@ export class GhostHub {
     this.blog = blog;
     this.error = null;
     this.readAt = this.now();
-    if (await this.transition(blog)) {
+    if ((await this.transition(blog)) || keyIsNew) {
       this.store.save(this.saved);
     }
     return firstRead || wasError || JSON.stringify(widgetSignature(blog)) !== before;
@@ -272,34 +286,58 @@ export class GhostHub {
   async transition(blog) {
     const saved = this.saved.blogs[blog.key];
     const before = JSON.stringify(saved ?? null);
-    const empty = { at: 0, ids: [] };
+    const member = marker(saved?.member);
+    const post = marker(saved?.post);
     const next = {
-      member: advanceMarker(saved?.member ?? empty, blog.members.recent, memberDate),
-      post: advanceMarker(saved?.post ?? empty, blog.posts.recent, postDate),
+      member: advanceMarker(member, blog.members.recent, memberDate),
+      post: advanceMarker(post, blog.posts.recent, postDate),
     };
     if (saved) {
-      for (const member of newerThan(saved.member ?? empty, blog.members.recent, memberDate)) {
-        logger.info(`${blog.site.title}: new ${member.status} member`);
-        await this.fire(TRIGGERS.NEW_MEMBER, blog, {
-          name: member.name,
-          email: member.email,
-          status: member.status,
-        });
-      }
-      for (const post of newerThan(saved.post ?? empty, blog.posts.recent, postDate)) {
-        logger.info(`${blog.site.title}: post published`);
-        await this.fire(TRIGGERS.POST_PUBLISHED, blog, { title: post.title, url: post.url });
-      }
+      // A refused event (Gladys restarting) keeps the marker just before it:
+      // the rest is announced at the next reading, nothing twice.
+      const announce = async (current, items, dateOf, key, dataOf) => {
+        let reached = current;
+        for (const item of newerThan(current, items, dateOf)) {
+          if (!(await this.fire(key, dataOf(item)))) {
+            return reached;
+          }
+          reached = advanceMarker(reached, [item], dateOf);
+        }
+        return advanceMarker(current, items, dateOf);
+      };
+      next.member = await announce(
+        member,
+        blog.members.recent,
+        memberDate,
+        TRIGGERS.NEW_MEMBER,
+        (item) => ({ name: item.name, email: item.email, status: item.status }),
+      );
+      next.post = await announce(
+        post,
+        blog.posts.recent,
+        postDate,
+        TRIGGERS.POST_PUBLISHED,
+        (item) => ({ title: item.title, url: item.url }),
+      );
     }
     this.saved.blogs[blog.key] = next;
     return JSON.stringify(next) !== before;
   }
 
-  async fire(key, blog, extra) {
+  /** @returns {Promise<boolean>} whether Gladys took the event */
+  async fire(key, extra) {
+    logger.debug(`Scene event ${key}`);
+    const data = { blog: this.blogName(), ...extra };
+    for (const [name, value] of Object.entries(data)) {
+      data[name] = value.slice(0, MAX_EVENT_TEXT); // the SDK refuses longer strings
+    }
     try {
-      await this.gladys.publishSceneEvent(key, { blog: blog.site.title, ...extra });
+      await this.gladys.publishSceneEvent(key, data);
+      this.problems.recover(`event-${key}`, `Scene event ${key} accepted again`);
+      return true;
     } catch (err) {
-      logger.warn(`Scene event ${key} refused: ${err.message}`);
+      this.problems.fail(`event-${key}`, `Scene event ${key} refused: ${err.message}`);
+      return false;
     }
   }
 
@@ -309,12 +347,20 @@ export class GhostHub {
     return (this.gladys.devices ?? []).some((device) => device.external_id === externalId);
   }
 
-  /** The device external ids of the blog last read. */
+  /** The key of the blog at the configured address: read, or remembered in /data. */
+  blogKey() {
+    return this.blog?.key ?? this.saved.keys[this.config.url] ?? null;
+  }
+
+  /**
+   * The device external ids to badge: the blog last read; before any
+   * successful read, the added devices of the integration.
+   */
   deviceIdsOfBlog() {
-    if (!this.blog) {
-      return [];
+    if (this.blog) {
+      return buildDevices(this.gladys, this.blog, this.config.language).map((d) => d.external_id);
     }
-    return buildDevices(this.gladys, this.blog, this.config.language).map((d) => d.external_id);
+    return (this.gladys.devices ?? []).map((d) => d.external_id).filter((id) => this.owns(id));
   }
 
   /** Publish the Discovery list when it changed (a newsletter added, a title…). */
@@ -368,14 +414,13 @@ export class GhostHub {
    * answering: the site goes offline, the counters keep their last value.
    */
   async publishStates() {
-    if (!this.blog) {
+    const key = this.blogKey();
+    if (!this.blog && !(this.error && key)) {
       return;
     }
-    const values = blogValues(
-      this.gladys,
-      { ...this.blog, error: this.error },
-      this.config.language,
-    );
+    // Ghost down since the start: only the site, offline.
+    const blog = this.blog ?? { key };
+    const values = blogValues(this.gladys, { ...blog, error: this.error }, this.config.language);
     const states = [];
     for (const [externalId, list] of values) {
       if (this.isCreated(externalId)) {
@@ -405,7 +450,7 @@ export class GhostHub {
 
   /** The badge of the added devices: local, or unreachable. */
   async publishTransports() {
-    if (!this.client || !this.blog) {
+    if (!this.client || (!this.blog && !this.error)) {
       return;
     }
     const transport = this.error ? DEVICE_TRANSPORTS.UNREACHABLE : DEVICE_TRANSPORTS.LOCAL;

@@ -142,7 +142,8 @@ mientras la integración estaba detenida se anuncia al reiniciarse.
 ## Límites
 
 - Solo lectura: la integración no cambia nada en Ghost.
-- Un blog por integración.
+- Un blog por integración. Una newsletter archivada conserva su dispositivo y
+  su último valor: elimínelo en Gladys.
 - «Miembros de pago» son todos los miembros menos los gratuitos: planes de pago
   y de cortesía juntos.
 - Un artículo publicado con una fecha pasada (antedatado) no activa **Artículo

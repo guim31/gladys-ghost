@@ -297,3 +297,53 @@ test('the container reads Ghost on its own timer, Gladys never polls', async (t)
   }
   assert.equal(world.ghost.requests.length, before + 9);
 });
+
+test('Ghost down from the start: the added devices go offline, by the remembered key', async (t) => {
+  const first = await createWorld();
+  await createDevices(first);
+  await first.app.stop();
+  const devices = first.gladys.devices.map((d) => ({ ...d }));
+
+  const ghost = new FakeGhost({ now: first.clock.now });
+  ghost.down = true;
+  const second = await createWorld({ clock: first.clock, ghost, devices, dataDir: first.dataDir });
+  t.after(() => second.app.stop());
+  assert.equal(second.fake.lastState(idsOf(second, 'site').feature(FEATURE_KEYS.ONLINE)), 0);
+  assert.deepEqual(
+    [...new Set(second.fake.transports.map((entry) => entry.transport))],
+    ['unreachable'],
+  );
+  assert.equal(second.fake.connectionStatus.connected, false);
+});
+
+test('a scene event refused by Gladys is announced at the next reading, and texts are cut', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  world.clock.advance(MINUTE);
+  world.ghost.addMember({ name: 'M'.repeat(1500) });
+  world.ghost.addPost({ title: 'P'.repeat(1500) });
+  const publish = world.gladys.publishSceneEvent.bind(world.gladys);
+  world.gladys.publishSceneEvent = async () => {
+    throw new Error('Gladys restarting');
+  };
+  await world.hub.pollNow();
+  assert.equal(world.fake.sceneEvents.length, 0);
+  world.gladys.publishSceneEvent = publish;
+  await world.hub.pollNow();
+  await world.hub.pollNow();
+  const fired = world.fake.sceneEvents;
+  assert.deepEqual(
+    fired.map((e) => e.key),
+    [TRIGGERS.NEW_MEMBER, TRIGGERS.POST_PUBLISHED],
+  );
+  assert.equal(fired[0].data.name.length, 255, 'Ghost texts are cut at 255');
+  assert.equal(fired[1].data.url.length, 1000, 'the SDK refuses more than 1000');
+});
+
+test('Refresh without configuration says what is missing', async (t) => {
+  const world = await createWorld({ config: {} });
+  t.after(() => world.app.stop());
+  const ack = await world.fake.widgetAction(WIDGET_KEY, 'refresh', {});
+  assert.equal(ack.success, true, ack.error);
+  assert.match(ack.data.message.en, /Fill in your Ghost blog/);
+});

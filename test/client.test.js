@@ -152,7 +152,12 @@ test('errors: key refused, rate limit, not Ghost, unreachable, certificate', asy
     }
     return null;
   };
-  assert.equal(await kindOf(async () => ({ status: 401, body: '{}' })), ERROR_KINDS.AUTH);
+  const invalidJwt = JSON.stringify({
+    errors: [{ message: 'Invalid token', code: 'INVALID_JWT' }],
+  });
+  assert.equal(await kindOf(async () => ({ status: 401, body: invalidJwt })), ERROR_KINDS.AUTH);
+  // A proxy or a firewall in front of Ghost: not the key.
+  assert.equal(await kindOf(async () => ({ status: 403, body: '<html>' })), ERROR_KINDS.HTTP);
   assert.equal(await kindOf(async () => ({ status: 429, body: '' })), ERROR_KINDS.RATE_LIMIT);
   assert.equal(await kindOf(async () => ({ status: 404, body: '' })), ERROR_KINDS.NOT_GHOST);
   assert.equal(await kindOf(async () => ({ status: 200, body: '<html>' })), ERROR_KINDS.NOT_GHOST);
@@ -203,16 +208,44 @@ test('a redirect keeping the API path moves the base; any other is refused', asy
     'https://192.0.2.10:2368/ghost/api/admin/site/',
   ]);
 
-  const away = clientWith(async () => ({
-    status: 302,
-    body: '',
-    location: 'https://login.example.net/',
-  }));
-  await assert.rejects(away.site(), { kind: ERROR_KINDS.REDIRECT });
+  const refusedTo = async (location, from = BASE) => {
+    const client = new GhostClient({
+      url: from,
+      key: ADMIN_KEY,
+      now: () => NOW,
+      request: async () => ({ status: 301, body: '', location }),
+    });
+    return (await client.site().catch((e) => e)).kind === ERROR_KINDS.REDIRECT;
+  };
+  assert.ok(await refusedTo('https://login.example.net/'), 'away from the API');
+  assert.ok(await refusedTo('https://other.example.net/ghost/api/admin/site/'), 'another host');
+  assert.ok(
+    await refusedTo('http://blog.example.org/ghost/api/admin/site/', 'https://blog.example.org'),
+    'a downgrade to http',
+  );
+
+  // The admin domain of Ghost(Pro) is followed.
+  const pro = new GhostClient({
+    url: 'https://blog.example.org',
+    key: ADMIN_KEY,
+    now: () => NOW,
+    request: async (url) =>
+      url.startsWith('https://blog.example.org')
+        ? { status: 301, body: '', location: 'https://myblog.ghost.io/ghost/api/admin/site/' }
+        : { status: 200, body: JSON.stringify(fixture.site) },
+  });
+  await pro.site();
+  assert.equal(pro.base, 'https://myblog.ghost.io/ghost/api/admin');
+
   let hops = 0;
-  const loop = clientWith(async (url) => {
-    hops += 1;
-    return { status: 301, body: '', location: url };
+  const loop = new GhostClient({
+    url: 'https://blog.example.org',
+    key: ADMIN_KEY,
+    now: () => NOW,
+    request: async (url) => {
+      hops += 1;
+      return { status: 301, body: '', location: url };
+    },
   });
   await assert.rejects(loop.site(), { kind: ERROR_KINDS.REDIRECT });
   assert.equal(hops, 4);

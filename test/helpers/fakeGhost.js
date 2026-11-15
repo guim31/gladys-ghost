@@ -83,7 +83,8 @@ export class FakeGhost {
       throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
     }
     if (this.status) {
-      return { status: this.status, body: '{}' };
+      const body = JSON.stringify({ errors: [{ message: 'Forced', code: `HTTP_${this.status}` }] });
+      return { status: this.status, body };
     }
     const { origin, pathname, searchParams } = new URL(url);
     const prefix = `${this.base}/ghost/api/admin/`;

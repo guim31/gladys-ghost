@@ -11,6 +11,7 @@
 import { missingCredentials } from './config.js';
 import { formatDate } from './devices.js';
 import { CONNECTION_TEXT, SENTENCE_TEXT, pick } from './texts.js';
+import { TEXT } from './widgets.js';
 
 export const SCENE_ACTIONS = {
   async get_blog_stats(hub) {
@@ -22,6 +23,10 @@ export const SCENE_ACTIONS = {
     // After a failed read too: a short outage must not fail the scene.
     await hub.refreshIfStale();
     hub.assertReadable();
+    if (!hub.blog) {
+      // The configuration changed during the reading.
+      throw new Error(pick(TEXT.waiting, language));
+    }
     const { members, posts } = hub.blog;
     const name = hub.blogName();
     const latest = posts.recent[0];

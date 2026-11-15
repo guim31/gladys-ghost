@@ -135,7 +135,8 @@ is announced at its restart.
 ## Limits
 
 - Read-only: the integration does not change anything in Ghost.
-- One blog per integration.
+- One blog per integration. An archived newsletter keeps its device and its
+  last value: delete it in Gladys.
 - "Paid members" is every member minus the free ones: paid and complimentary
   plans together.
 - A post published with a date in the past (back-dated) does not fire **Post
