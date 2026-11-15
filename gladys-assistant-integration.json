@@ -1,177 +1,552 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Ghost",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Members, posts and newsletters of your Ghost blog in Gladys, with scenes on new members and posts.",
+    "fr": "Membres, articles et newsletters de votre blog Ghost dans Gladys, avec scènes sur nouveaux membres.",
+    "de": "Mitglieder, Beiträge und Newsletter deines Ghost-Blogs in Gladys, mit Szenen bei neuen Mitgliedern.",
+    "es": "Miembros, artículos y newsletters de su blog Ghost en Gladys, con escenas por nuevos miembros."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-ghost:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-ghost/main/cover.png",
+  "categories": ["services"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Your Ghost blog",
+        "fr": "Votre blog Ghost",
+        "de": "Dein Ghost-Blog",
+        "es": "Su blog Ghost"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "In Ghost: Settings → Integrations → Add custom integration, then copy its Admin API key. Fill in the address of the blog, then add the devices from the Discover tab.",
+        "fr": "Dans Ghost : Settings → Integrations → Add custom integration, puis copiez sa clé Admin API. Indiquez l'adresse du blog, puis ajoutez les appareils depuis l'onglet Découverte.",
+        "de": "In Ghost: Settings → Integrations → Add custom integration, dann kopiere den Admin-API-Schlüssel. Gib die Adresse des Blogs an und lege die Geräte im Tab „Entdecken“ an.",
+        "es": "En Ghost: Settings → Integrations → Add custom integration, luego copie su clave Admin API. Indique la dirección del blog y añada los dispositivos desde la pestaña Descubrir."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://github.com/guim31/gladys-ghost/blob/main/docs/en.md",
+          "label": {
+            "en": "Setup guide",
+            "fr": "Guide d'installation",
+            "de": "Einrichtungsanleitung",
+            "es": "Guía de instalación"
+          }
+        },
+        {
+          "url": "https://ghost.org/docs/admin-api/",
+          "label": {
+            "en": "Ghost Admin API",
+            "fr": "API Admin de Ghost",
+            "de": "Ghost-Admin-API",
+            "es": "API Admin de Ghost"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "url",
+      "type": "string",
+      "label": {
+        "en": "Blog address",
+        "fr": "Adresse du blog",
+        "de": "Adresse des Blogs",
+        "es": "Dirección del blog"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
+      "description": {
+        "en": "The address of your Ghost site (or of its admin, if separate).",
+        "fr": "L'adresse de votre site Ghost (ou de son admin, si elle est distincte).",
+        "de": "Die Adresse deiner Ghost-Seite (oder ihres Admins, falls getrennt).",
+        "es": "La dirección de su sitio Ghost (o de su admin, si es distinta)."
+      },
+      "placeholder": {
+        "en": "e.g. https://blog.example.org",
+        "fr": "ex. https://blog.example.org",
+        "de": "z. B. https://blog.example.org",
+        "es": "p. ej. https://blog.example.org"
+      },
       "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "default": ""
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+      "key": "admin_api_key",
+      "type": "secret",
+      "label": {
+        "en": "Admin API key",
+        "fr": "Clé Admin API",
+        "de": "Admin-API-Schlüssel",
+        "es": "Clave Admin API"
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
+      "description": {
+        "en": "The Admin API key of the custom integration (id:secret), not the Content API key.",
+        "fr": "La clé Admin API de l'intégration personnalisée (id:secret), pas la clé Content API.",
+        "de": "Der Admin-API-Schlüssel der eigenen Integration (id:secret), nicht der Content-API-Schlüssel.",
+        "es": "La clave Admin API de la integración personalizada (id:secret), no la clave Content API."
+      },
+      "required": true
     },
     {
-      "key": "unit",
+      "key": "poll_interval",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "label": {
+        "en": "Refresh interval",
+        "fr": "Intervalle de rafraîchissement",
+        "de": "Aktualisierungsintervall",
+        "es": "Intervalo de actualización"
+      },
+      "description": {
+        "en": "How often Ghost is read (9 requests each time). Also the delay of the scenes.",
+        "fr": "Fréquence de lecture de Ghost (9 requêtes à chaque fois). C'est aussi le délai des scènes.",
+        "de": "Wie oft Ghost gelesen wird (jedes Mal 9 Anfragen). Auch die Verzögerung der Szenen.",
+        "es": "Frecuencia de lectura de Ghost (9 peticiones cada vez). También es el retraso de las escenas."
+      },
       "required": false,
-      "default": "celsius",
+      "default": "300",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "60",
+          "label": {
+            "en": "1 minute",
+            "fr": "1 minute",
+            "de": "1 Minute",
+            "es": "1 minuto"
+          }
+        },
+        {
+          "value": "300",
+          "label": {
+            "en": "5 minutes",
+            "fr": "5 minutes",
+            "de": "5 Minuten",
+            "es": "5 minutos"
+          }
+        },
+        {
+          "value": "900",
+          "label": {
+            "en": "15 minutes",
+            "fr": "15 minutes",
+            "de": "15 Minuten",
+            "es": "15 minutos"
+          }
+        },
+        {
+          "value": "1800",
+          "label": {
+            "en": "30 minutes",
+            "fr": "30 minutes",
+            "de": "30 Minuten",
+            "es": "30 minutos"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the names",
+        "fr": "Langue des noms",
+        "de": "Sprache der Namen",
+        "es": "Idioma de los nombres"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Language of the feature names, dates and scene sentences.",
+        "fr": "Langue des noms de fonctionnalités, des dates et des phrases de scène.",
+        "de": "Sprache der Funktionsnamen, Datumsangaben und Szenensätze.",
+        "es": "Idioma de los nombres de funciones, las fechas y las frases de escena."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "test_connection",
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion",
+        "de": "Verbindung testen",
+        "es": "Probar la conexión"
+      },
+      "timeout_seconds": 60
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "new_member",
+      "label": {
+        "en": "New member",
+        "fr": "Nouveau membre",
+        "de": "Neues Mitglied",
+        "es": "Nuevo miembro"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "Someone joins the blog as a member (seen at the next reading of Ghost).",
+        "fr": "Quelqu'un devient membre du blog (vu à la lecture suivante de Ghost).",
+        "de": "Jemand wird Mitglied des Blogs (bei der nächsten Abfrage von Ghost erkannt).",
+        "es": "Alguien se hace miembro del blog (detectado en la siguiente lectura de Ghost)."
       },
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
+          "key": "status",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "label": {
+            "en": "Plan (empty: any)",
+            "fr": "Formule (vide : toutes)",
+            "de": "Tarif (leer: alle)",
+            "es": "Plan (vacío: todos)"
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "free",
+              "label": {
+                "en": "Free",
+                "fr": "Gratuit",
+                "de": "Kostenlos",
+                "es": "Gratuito"
+              }
+            },
+            {
+              "value": "paid",
+              "label": {
+                "en": "Paid",
+                "fr": "Payant",
+                "de": "Zahlend",
+                "es": "De pago"
+              }
+            },
+            {
+              "value": "comped",
+              "label": {
+                "en": "Complimentary",
+                "fr": "Offert",
+                "de": "Geschenkt",
+                "es": "Cortesía"
+              }
+            }
           ]
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "blog",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Blog name",
+            "fr": "Nom du blog",
+            "de": "Name des Blogs",
+            "es": "Nombre del blog"
+          }
+        },
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Member name",
+            "fr": "Nom du membre",
+            "de": "Name des Mitglieds",
+            "es": "Nombre del miembro"
+          }
+        },
+        {
+          "key": "email",
+          "type": "string",
+          "label": {
+            "en": "Member email",
+            "fr": "E-mail du membre",
+            "de": "E-Mail des Mitglieds",
+            "es": "Correo del miembro"
+          }
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "label": {
+            "en": "Plan (free, paid, comped)",
+            "fr": "Formule (free, paid, comped)",
+            "de": "Tarif (free, paid, comped)",
+            "es": "Plan (free, paid, comped)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "post_published",
+      "label": {
+        "en": "Post published",
+        "fr": "Article publié",
+        "de": "Beitrag veröffentlicht",
+        "es": "Artículo publicado"
+      },
+      "description": {
+        "en": "A post is published, now or as scheduled (seen at the next reading of Ghost).",
+        "fr": "Un article est publié, tout de suite ou à l'heure programmée (vu à la lecture suivante de Ghost).",
+        "de": "Ein Beitrag wird veröffentlicht, sofort oder geplant (bei der nächsten Abfrage von Ghost erkannt).",
+        "es": "Se publica un artículo, al momento o a la hora programada (detectado en la siguiente lectura de Ghost)."
+      },
+      "variables": [
+        {
+          "key": "blog",
+          "type": "string",
+          "label": {
+            "en": "Blog name",
+            "fr": "Nom du blog",
+            "de": "Name des Blogs",
+            "es": "Nombre del blog"
+          }
+        },
+        {
+          "key": "title",
+          "type": "string",
+          "label": {
+            "en": "Post title",
+            "fr": "Titre de l'article",
+            "de": "Titel des Beitrags",
+            "es": "Título del artículo"
+          }
+        },
+        {
+          "key": "url",
+          "type": "string",
+          "label": {
+            "en": "Post address",
+            "fr": "Adresse de l'article",
+            "de": "Adresse des Beitrags",
+            "es": "Dirección del artículo"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "get_blog_stats",
+      "label": {
+        "en": "Read the figures of the blog",
+        "fr": "Lire les chiffres du blog",
+        "de": "Zahlen des Blogs lesen",
+        "es": "Leer las cifras del blog"
       },
-      "timeout_seconds": 15,
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ],
+      "description": {
+        "en": "Reads members and posts for the next actions, and a ready-made sentence.",
+        "fr": "Lit membres et articles pour les actions suivantes, et une phrase toute prête.",
+        "de": "Liest Mitglieder und Beiträge für die nächsten Aktionen, und einen fertigen Satz.",
+        "es": "Lee miembros y artículos para las siguientes acciones, y una frase lista."
+      },
+      "timeout_seconds": 30,
       "outputs": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Blog name",
+            "fr": "Nom du blog",
+            "de": "Name des Blogs",
+            "es": "Nombre del blog"
+          }
+        },
+        {
+          "key": "members",
+          "type": "number",
+          "label": {
+            "en": "Members",
+            "fr": "Membres",
+            "de": "Mitglieder",
+            "es": "Miembros"
+          }
+        },
+        {
+          "key": "free",
+          "type": "number",
+          "label": {
+            "en": "Free members",
+            "fr": "Membres gratuits",
+            "de": "Kostenlose Mitglieder",
+            "es": "Miembros gratuitos"
+          }
+        },
+        {
+          "key": "paid",
+          "type": "number",
+          "label": {
+            "en": "Paid members",
+            "fr": "Membres payants",
+            "de": "Zahlende Mitglieder",
+            "es": "Miembros de pago"
+          }
+        },
+        {
+          "key": "new_24h",
+          "type": "number",
+          "label": {
+            "en": "New members (24 h)",
+            "fr": "Nouveaux membres (24 h)",
+            "de": "Neue Mitglieder (24 h)",
+            "es": "Nuevos miembros (24 h)"
+          }
+        },
+        {
+          "key": "new_7d",
+          "type": "number",
+          "label": {
+            "en": "New members (7 days)",
+            "fr": "Nouveaux membres (7 jours)",
+            "de": "Neue Mitglieder (7 Tage)",
+            "es": "Nuevos miembros (7 días)"
+          }
+        },
+        {
+          "key": "published",
+          "type": "number",
+          "label": {
+            "en": "Published posts",
+            "fr": "Articles publiés",
+            "de": "Veröffentlichte Beiträge",
+            "es": "Artículos publicados"
+          }
+        },
+        {
+          "key": "drafts",
+          "type": "number",
+          "label": {
+            "en": "Drafts",
+            "fr": "Brouillons",
+            "de": "Entwürfe",
+            "es": "Borradores"
+          }
+        },
+        {
+          "key": "scheduled",
+          "type": "number",
+          "label": {
+            "en": "Scheduled posts",
+            "fr": "Articles programmés",
+            "de": "Geplante Beiträge",
+            "es": "Artículos programados"
+          }
+        },
+        {
+          "key": "latest_title",
+          "type": "string",
+          "label": {
+            "en": "Latest post",
+            "fr": "Dernier article",
+            "de": "Neuester Beitrag",
+            "es": "Último artículo"
+          }
+        },
+        {
+          "key": "latest_url",
+          "type": "string",
+          "label": {
+            "en": "Latest post address",
+            "fr": "Adresse du dernier article",
+            "de": "Adresse des neuesten Beitrags",
+            "es": "Dirección del último artículo"
+          }
+        },
+        {
+          "key": "sentence",
+          "type": "string",
+          "label": {
+            "en": "Sentence",
+            "fr": "Phrase",
+            "de": "Satz",
+            "es": "Frase"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "ghost_overview",
+      "label": {
+        "en": "Ghost blog",
+        "fr": "Blog Ghost",
+        "de": "Ghost-Blog",
+        "es": "Blog Ghost"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Members, paid members, new members this week, posts and the latest post.",
+        "fr": "Membres, payants, nouveaux de la semaine, articles et dernier article.",
+        "de": "Mitglieder, zahlende, neue dieser Woche, Beiträge und der neueste Beitrag.",
+        "es": "Miembros, de pago, nuevos de la semana, artículos y el último artículo."
+      },
+      "icon": "book-open",
+      "action_timeout_seconds": 30,
+      "settings": [
+        {
+          "key": "show_latest",
+          "type": "boolean",
+          "label": {
+            "en": "Show the latest post",
+            "fr": "Afficher le dernier article",
+            "de": "Neuesten Beitrag anzeigen",
+            "es": "Mostrar el último artículo"
+          },
+          "required": false,
+          "default": true
+        },
+        {
+          "key": "show_refresh",
+          "type": "boolean",
+          "label": {
+            "en": "Show the Refresh button",
+            "fr": "Afficher le bouton Actualiser",
+            "de": "Schaltfläche Aktualisieren anzeigen",
+            "es": "Mostrar el botón Actualizar"
+          },
+          "required": false,
+          "default": true
+        }
+      ]
     }
   ]
 }

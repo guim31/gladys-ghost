@@ -1,41 +1,51 @@
 // -----------------------------------------------------------------------------
-// Scene actions (SDK v0.14+, Gladys 5.1+).
+// Scene action handlers (manifest `scene_actions`, Gladys 5.1+).
 //
-// A scene action is an OPERATION a scene author places in a scene, with
-// parameters and a result: "identify this device", "take a snapshot", "clean
-// these rooms". Each one is declared in the manifest `scene_actions` field
-// (key, label, `fields` in the config_schema grammar, scalar `outputs`) and
-// handled here, keyed by that same `key`; index.js registers every entry with
-// `gladys.onSceneAction(key, ...)`.
-//
-// Scene TRIGGERS are the other direction ("this happened"): they are fired by
-// the device that observes the event, see src/devices/motionSensor.js.
-//
-// The rules that matter:
-//   - `fields` arrive RESOLVED: scene variables substituted, defaults applied,
-//     validated by the core; a `"source": "devices"` field is the chosen
-//     device external_id;
-//   - resolve an object of the declared `outputs` (scalars only), readable by
-//     the following actions of the scene, or `undefined` for none. Keys not
-//     declared in the manifest are dropped by the core;
-//   - throwing fails THIS action only: the scene logs it and continues. A
-//     scene action is never a condition: return an output and let the scene
-//     author gate on it;
-//   - never fire a scene event as a consequence of a received action: a scene
-//     bound to that event would loop through the integration.
+// A threshold on one figure is already a scene condition on a device feature.
+// The action is about what a condition cannot do: put the figures of the blog
+// in a message ("Blog: 132 members, 12 paid, 3 new in 24 h, 9 in 7 days,
+// latest post "Hello" on 15/11/2026 21:22"). It reads Ghost again when the
+// last read is older than 15 seconds.
 // -----------------------------------------------------------------------------
 
-import { createLogger } from '@gladysassistant/integration-sdk';
-import { signalDevice } from './devices/index.js';
-
-const logger = createLogger({ name: 'scenes' });
+import { missingCredentials } from './config.js';
+import { formatDate } from './devices.js';
+import { CONNECTION_TEXT, SENTENCE_TEXT, pick } from './texts.js';
 
 export const SCENE_ACTIONS = {
-  // The ack is awaited under the action's `timeout_seconds` (15 s in the
-  // manifest), counted from the moment the scene reaches the action.
-  async identify_device(gladys, { fields, config }) {
-    logger.info(`Scene action identify_device <- ${fields.device}`);
-    const signalled = await signalDevice(gladys, fields.device, config);
-    return { signalled };
+  async get_blog_stats(hub) {
+    const language = hub.config.language;
+    const missing = missingCredentials(hub.config);
+    if (missing) {
+      throw new Error(pick(CONNECTION_TEXT[missing], language));
+    }
+    // After a failed read too: a short outage must not fail the scene.
+    await hub.refreshIfStale();
+    hub.assertReadable();
+    const { members, posts } = hub.blog;
+    const name = hub.blogName();
+    const latest = posts.recent[0];
+    const words = SENTENCE_TEXT[language] ?? SENTENCE_TEXT.en;
+    const parts = [
+      words.members(name, members.total, members.paid),
+      words.fresh(members.new24h, members.new7d),
+    ];
+    if (latest) {
+      parts.push(words.latest(latest.title, formatDate(latest.publishedAt, language)));
+    }
+    return {
+      name,
+      members: members.total,
+      free: members.free,
+      paid: members.paid,
+      new_24h: members.new24h,
+      new_7d: members.new7d,
+      published: posts.published,
+      drafts: posts.drafts,
+      scheduled: posts.scheduled,
+      latest_title: latest?.title ?? '',
+      latest_url: latest?.url ?? '',
+      sentence: `${parts.join(', ')}.`,
+    };
   },
 };
