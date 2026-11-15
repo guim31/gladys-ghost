@@ -347,3 +347,23 @@ test('Refresh without configuration says what is missing', async (t) => {
   assert.equal(ack.success, true, ack.error);
   assert.match(ack.data.message.en, /Fill in your Ghost blog/);
 });
+
+test('a scene event refused for good is skipped, the next ones still go out', async (t) => {
+  const world = await createWorld();
+  t.after(() => world.app.stop());
+  world.clock.advance(MINUTE);
+  world.ghost.addMember({ name: 'Refused' });
+  const publish = world.gladys.publishSceneEvent.bind(world.gladys);
+  world.gladys.publishSceneEvent = async () => {
+    throw Object.assign(new Error('Unknown trigger'), { status: 404 });
+  };
+  await world.hub.pollNow();
+  world.gladys.publishSceneEvent = publish;
+  world.clock.advance(MINUTE);
+  world.ghost.addMember({ name: 'Next' });
+  await world.hub.pollNow();
+  assert.deepEqual(
+    world.fake.sceneEvents.map((e) => e.data.name),
+    ['Next'],
+  );
+});

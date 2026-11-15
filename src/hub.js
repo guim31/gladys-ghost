@@ -293,12 +293,13 @@ export class GhostHub {
       post: advanceMarker(post, blog.posts.recent, postDate),
     };
     if (saved) {
-      // A refused event (Gladys restarting) keeps the marker just before it:
-      // the rest is announced at the next reading, nothing twice.
+      // An event Gladys cannot take now (restarting, overloaded) keeps the
+      // marker just before it: the rest is announced at the next reading,
+      // nothing twice. One refused for good is skipped.
       const announce = async (current, items, dateOf, key, dataOf) => {
         let reached = current;
         for (const item of newerThan(current, items, dateOf)) {
-          if (!(await this.fire(key, dataOf(item)))) {
+          if ((await this.fire(key, dataOf(item))) === 'retry') {
             return reached;
           }
           reached = advanceMarker(reached, [item], dateOf);
@@ -324,7 +325,7 @@ export class GhostHub {
     return JSON.stringify(next) !== before;
   }
 
-  /** @returns {Promise<boolean>} whether Gladys took the event */
+  /** @returns {Promise<'ok'|'retry'|'skip'>} 'retry' when Gladys may take it later */
   async fire(key, extra) {
     logger.debug(`Scene event ${key}`);
     const data = { blog: this.blogName(), ...extra };
@@ -334,10 +335,11 @@ export class GhostHub {
     try {
       await this.gladys.publishSceneEvent(key, data);
       this.problems.recover(`event-${key}`, `Scene event ${key} accepted again`);
-      return true;
+      return 'ok';
     } catch (err) {
       this.problems.fail(`event-${key}`, `Scene event ${key} refused: ${err.message}`);
-      return false;
+      const status = Number(err.status);
+      return !status || status === 429 || status >= 500 ? 'retry' : 'skip';
     }
   }
 
