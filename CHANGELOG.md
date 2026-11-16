@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-16
+
 ### Added
 
 - First version: the figures of a Ghost blog (Ghost 5 or 6, self-hosted or
@@ -23,4 +25,5 @@ the notes of the version's GitHub Release.
   hidden.
 - "Test the connection" action, texts in English, French, German and Spanish.
 
-[Unreleased]: https://github.com/guim31/gladys-ghost/commits/main
+[Unreleased]: https://github.com/guim31/gladys-ghost/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/guim31/gladys-ghost/releases/tag/v1.0.0
