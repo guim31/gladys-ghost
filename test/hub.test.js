@@ -194,6 +194,11 @@ test('a refused key, a Content API key, a missing address: a readable status', a
   refused.ghost.status = 401;
   await refused.hub.pollNow();
   assert.match(refused.fake.connectionStatus.message.en, /Admin API key refused/);
+  // A failed test is an error, shown in red, in every language.
+  const failed = await refused.fake.action('test_connection', {});
+  assert.equal(failed.success, false);
+  assert.match(failed.error.en, /Admin API key refused/);
+  assert.deepEqual(Object.keys(failed.error), ['en', 'fr', 'de', 'es']);
   assert.deepEqual(Object.keys(refused.fake.connectionStatus.message), ['en', 'fr', 'de', 'es']);
 
   const content = await createWorld({

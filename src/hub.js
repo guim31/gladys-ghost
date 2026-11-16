@@ -80,6 +80,14 @@ function marker(raw) {
 const memberDate = (member) => member.createdAt;
 const postDate = (post) => post.publishedAt;
 
+/** A failed action: Gladys shows the message in red, in the user's language. */
+export class ActionFailure extends Error {
+  constructor(text) {
+    super(text.en);
+    this.message = text;
+  }
+}
+
 export class GhostHub {
   /**
    * @param {object} options
@@ -535,11 +543,14 @@ export class GhostHub {
     await this.pollNow({ publish: true });
     const message = {};
     const status = this.connectionStatus();
-    for (const [language, text] of Object.entries(REPORT_TEXT)) {
-      if (!status.connected || !this.blog) {
+    if (!status.connected || !this.blog) {
+      // A failure is thrown: Gladys shows it in red.
+      for (const language of Object.keys(REPORT_TEXT)) {
         message[language] = pick(status.message ?? ERROR_TEXT.http, language);
-        continue;
       }
+      throw new ActionFailure(message);
+    }
+    for (const [language, text] of Object.entries(REPORT_TEXT)) {
       const parts = [
         text.ok(this.blog.site.version),
         text.members(this.blog.members.total),
