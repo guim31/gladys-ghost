@@ -31,16 +31,20 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK wiring only, through src/app.js
+src/app.js                        registers every SDK handler on the hub (also used by the tests)
+src/hub.js                        reading timer, states, transports, status, scene triggers
+src/ghost/client.js               Ghost Admin API client (JWT with node:crypto, redirects, errors)
+src/devices.js                    discovery payloads and states (site, members, posts, newsletters)
+src/scenes.js                     scene action `get_blog_stats`
+src/widgets.js                    widget `ghost_overview`
+src/texts.js                      four-language texts (status, errors, report, sentence)
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+src/store.js, src/problems.js     /data/ghost-state.json; one log line per lasting failure
+gladys-assistant-integration.json manifest: name, config_schema, actions, scenes, widget...
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys
+test/                             node --test, SDK fake Gladys + in-memory Ghost (test/helpers)
+test/fixtures/ghost/              real answers of Ghost 6.77, anonymized
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -251,3 +255,21 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Ghost (Admin API)
+
+- Vérifié contre un vrai Ghost 6.77 (image officielle `ghost:alpine`, SQLite, `NODE_ENV=development`) le
+  15/11/2026. Mise en place sans navigateur : `POST /ghost/api/admin/authentication/setup/` puis
+  `POST /ghost/api/admin/session/` (en-tête `Origin` obligatoire), puis `POST /integrations/?include=api_keys`.
+- **Ghost 6 rend la clé Admin d'une intégration sous la forme complète `id:secret`** dans `api_keys[].secret`
+  (89 caractères), comme l'admin l'affiche. La configuration attend `id:secret`.
+- JWT : HS256, `kid` = id de la clé, secret **décodé de l'hexadécimal**, `aud: '/admin/'`, 5 min au plus
+  (Ghost refuse au-delà). `Accept-Version: v5.0` est accepté par Ghost 6.
+- Les comptes viennent de `meta.pagination.total` avec `limit=1` : neuf requêtes par lecture quelle que soit la
+  taille du blog. `fields=` est ignoré sur `/members/` (objets complets) mais respecté sur `/posts/`.
+- Filtre de date NQL : `created_at:>'YYYY-MM-DD HH:mm:ss'`, en UTC. Les dates Ghost sont à la seconde : deux
+  membres créés dans la même seconde existent (repères `{ at, ids }` dans `src/hub.js`).
+- Le setup crée un article publié « Coming soon » : un blog neuf a déjà un article publié.
+- `/site/` répond sans authentification : il ne prouve pas la clé, `/members/` si.
+- Les membres payants n'ont pas été testés (Stripe absent du conteneur de test) : `paid` = total − gratuits
+  (payants et offerts).

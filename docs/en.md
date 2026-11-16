@@ -1,61 +1,146 @@
-# Demo Devices Template
+# Ghost
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+[Ghost](https://ghost.org/) is an open source (MIT) publishing platform for
+blogs and newsletters, self-hosted or on Ghost(Pro). This integration brings
+the figures of your blog into Gladys: its members (free, paid, new ones), its
+posts (published, drafts, scheduled, the latest one) and the subscribers of
+each newsletter. Scenes can react to a new member or to a new post, a
+dashboard widget shows the blog at a glance, and a scene action puts its
+figures in a message.
 
-## What you get
+Tested against a real self-hosted Ghost 6.77 (Docker, SQLite); not yet on
+Ghost(Pro), and paid members could not be tested (no Stripe account): feedback
+welcome on [the issues](https://github.com/guim31/gladys-ghost/issues).
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+## What you need
 
-## Configuration
+- Gladys Assistant 5.1.0 or later.
+- A Ghost blog, version 5 or 6, self-hosted or on Ghost(Pro), reachable from
+  the Gladys machine.
+- The **Admin API key** of a custom integration (an owner or administrator of
+  the blog creates it). The key reads everything on the blog: the integration
+  only reads, never writes.
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+At each refresh the integration sends nine requests to Ghost, whatever the
+size of the blog (the counts come from the totals of the API, one member or
+post per request). Ghost publishes no quota for the Admin API; every 5 minutes
+by default stays far below what any blog handles.
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+## Getting started
 
-## Actions
+### 1. Create a custom integration in Ghost
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+1. In the Ghost admin, open **Settings → Integrations** (under "Advanced").
+2. **Add custom integration**, name it "Gladys", then **Create**.
+3. Copy the **Admin API key** (it looks like `6a1b…:9f3c…`, an id, a colon and
+   a long secret). Not the Content API key: it cannot read the members.
 
-## Scenes
+### 2. Configure the integration
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+1. In Gladys, **Integrations → Ghost → Configuration**.
+2. **Blog address**: the address of your site, for example
+   `https://blog.example.org` (an address copied from the admin,
+   `…/ghost/#/dashboard`, works too). A local Ghost: `http://192.168.1.10:2368`.
+   If the admin of your blog has its own domain, use that one.
+3. **Admin API key**: paste the key.
+4. **Refresh interval**: 1, 5 (default), 15 or 30 minutes. It is also the
+   delay of the scenes.
+5. **Language of the names**: the language of the feature names, the dates and
+   the scene sentences (French by default).
+6. Save, then **Test the connection**: it answers with the version of Ghost,
+   the members and the published posts.
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+### 3. Add the devices
+
+Open the **Discover** tab: the blog, its members, its posts and each active
+newsletter are proposed as devices. Add the ones you want.
+
+## The devices
+
+The blog (named after its title):
+
+- **Online**: 1 when Ghost answers, 0 otherwise.
+- **Ghost version**: for example `6.77`.
+
+"Members":
+
+- **Members**, **Free members**, **Paid members** (complimentary plans
+  included).
+- **New members (24 h)** and **New members (7 days)**: members who joined in
+  the last 24 hours, the last 7 days.
+
+"Posts":
+
+- **Published posts**, **Drafts**, **Scheduled posts**.
+- **Latest post**: the title of the newest published post, and **Latest post
+  date**: its date, in the time zone of Gladys.
+
+"Newsletter …", one per active newsletter: **Subscribers**.
+
+The values are sent to Gladys only when they change (and every 12 hours at
+least), with history for the counters.
 
 ## Dashboard
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+The **Ghost blog** widget shows four tiles (members, paid, new in 7 days,
+posts), the latest post with its date, and a **Refresh** button that reads
+Ghost again at once. The latest post and the button can be hidden in the
+widget settings. When Ghost does not answer, the widget says why under the
+last figures read.
+
+## Scenes
+
+### Triggers
+
+- **New member**: someone joins the blog. Optionally restrict it to a plan
+  (free, paid, complimentary). The scene can use the name and email of the
+  member, their plan and the name of the blog.
+- **Post published**: a post is published, right away or at its scheduled
+  time. The scene can use the title and the address of the post.
+
+Both are seen at the next reading of Ghost (the refresh interval). The first
+reading only records what exists; what came while the integration was stopped
+is announced at its restart.
+
+### Actions
+
+- **Read the figures of the blog**: reads members and posts again (if the last
+  reading is older than 15 seconds) and gives them to the next actions, with a
+  ready-made sentence: "My blog: 132 member(s), 12 paid, 3 new in 24 h, 9 in 7
+  days, latest post "Hello" on 15/11/2026, 21:22."
+
+### Scene ideas
+
+- A notification "New member: {{name}}" on **New member**, only for paid ones.
+- Every Monday at 8:00, **Read the figures of the blog** then send the sentence
+  to your phone.
+- When **Online** stays at 0 for 10 minutes, a notification: the blog is down.
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **"Ghost does not answer"**: check the address and that the Gladys machine
+  can reach it.
+- **"Admin API key refused"**: the custom integration was deleted or its key
+  regenerated: copy the key again.
+- **"This is not an Admin API key"**: you copied the Content API key.
+- **"no Ghost blog at this address"**: check the address; a Ghost in a
+  sub-directory (`https://example.org/blog`) needs it.
+- **"the address redirects elsewhere"**: enter the address of the Ghost admin
+  (the one of your browser when you log in to Ghost).
+- **"certificate refused"**: a self-signed certificate is not accepted: use
+  the `http://` address on your network.
+- The logs of the integration (**Integrations → Ghost**) say more; nothing is
+  written there during a normal reading cycle.
+
+## Limits
+
+- Read-only: the integration does not change anything in Ghost.
+- One blog per integration. An archived newsletter keeps its device and its
+  last value: delete it in Gladys.
+- "Paid members" is every member minus the free ones: paid and complimentary
+  plans together.
+- A post published with a date in the past (back-dated) does not fire **Post
+  published**. At most 20 new members and 10 new posts are announced per
+  reading.
+- Not tested on Ghost(Pro) nor with Stripe yet, and not affiliated with the
+  Ghost Foundation.
